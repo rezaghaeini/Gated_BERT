@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>Interpretable BERT</title>
+    <!-- Load jQuery -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <!-- Load d3.js -->
+    <script src="https://d3js.org/d3.v4.js"></script>
+
+    <style>
+      a{
+        color: blue;
+        text-decoration: underline;
+        }
+      a:hover {
+        color: hotpink;
+      }
+      .select {
+        color: red;
+      }
+      div.scrollmenu {
+        overflow: auto;
+        white-space: nowrap;
+      }
+      div.insidescroll {
+        display: inline-block;
+        padding: 3px;
+      }
+      .collapsible {
+        font-family: centrale_sans_book, tahoma, arial, helvetica, sans-serif;
+        font-size: 15px;
+        font-stretch: normal;
+        font-style: normal;
+        font-variant: normal;
+        font-weight: normal;
+        background-color: #777;
+        color: white;
+        cursor: pointer;
+        padding: 6px;
+        width: 100%;
+        border: none;
+        text-align: left;
+        outline: none;
+        border-bottom:1px solid black;
+      }
+      .active, .collapsible:hover {
+        background-color: #555;
+        border-bottom:1px solid black;
+      }
+      .content {
+        padding: 0 18px;
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.2s ease-out;
+        background-color: #f1f1f1;
+      }
+      .div-logo-row  {
+        height: 125px;
+        background-image: linear-gradient(145deg, rgb(11, 34, 101), rgb(0, 57, 166));
+        margin-bottom: 30px;
+        white-space: nowrap;
+      }
+      .title {
+        font-family: centrale_sans_xbold, tahoma, arial, helvetica, sans-serif;
+        font-size: 60px;
+        font-stretch: normal;
+        font-style: normal;
+        font-variant: normal;
+        font-weight: normal;
+        color:#FFF;
+        margin-left:25px;
+        padding-top:25px;
+        float: left;
+        display: inline-block;
+        vertical-align: top;
+      }
+      .column_logo {
+        float: right;
+        display: inline-block;
+        vertical-align: top;
+        padding: 5px;
+      }
+      .foot_text {
+        display: inline-block;
+        vertical-align: top;
+      }
+      .side_inbl {
+        display: inline-block;
+        vertical-align: top;
+      }
+      .side_container {
+        white-space: nowrap;
+        padding: 3px;
+      }
+      .vector_embed {
+        display: block;
+      }
+      .array_embed {
+        display: block;
+        padding: 1px;
+      }
+      #footer {
+        font-family: centrale_sans_book, tahoma, arial, helvetica, sans-serif;
+        font-size: 14px;
+        font-stretch: normal;
+        font-style: normal;
+        font-variant: normal;
+        font-weight: normal;
+        color: white;
+        background-image: linear-gradient(145deg, rgb(11, 34, 101), rgb(0, 57, 166));
+        padding-bottom: 20px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="div-logo-row">
+      <div class="title">Interpretable BERT</div>
+      <div class="column_logo">
+        <img src="/static/img/Microsoft_logo.png" alt="" width="115" height="115">
+      </div>
+    </div>
+    <hr/>
+
+    <div>
+      <form action="." method="POST" style="margin-bottom: 10px;">
+        <div class="side_container">
+          <label for="tasks" class="side_inbl" style="width: 6em;">Task:</label>
+          <select class="side_inbl" name="taskcombo" id="taskcombo" style="font-size: 18px; height: 1em;">
+            {% for task_index in range(0, info["task_count"]) %}
+              <option item-id="option_{{loop.index0}}" s2_sts="{{ info["task_pair"][task_index] }}" value="{{ info["task_set"][task_index] }}" {% if task_index == info["selected_task_id"] %} selected {% endif %}>{{ info["task_set"][task_index] }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="side_container">
+          <label for="users" class="side_inbl" style="width: 6em;">User Type:</label>
+          <select class="side_inbl" name="usercombo" id="usercombo" style="font-size: 18px; height: 1em;">
+            <option item-id="user_0" value="Developer" {% if info["selected_user"] == "Developer" %} selected {% endif %}>Developer</option>
+            <option item-id="user_1" value="User" {% if info["selected_user"] == "User" %} selected {% endif %}>User</option>
+          </select>
+        </div>
+        <div class="side_container">
+          <label for="input01" class="side_inbl" style="width: 6em;">1st Sentence:</label>
+          <input type="text" class="side_inbl" name="input01" id="input01" style="font-size: 18px; height: 1em; width: 70%; word-break: break-word;" value="{{ info["input01"] }}">
+        </div>
+        <div class="side_container" id="input02_div">
+          <label for="input02" class="side_inbl" name="lbl02" id="lbl02" style="width: 6em;">2nd Sentence:</label>
+          <input type="text" class="side_inbl" name="input02" id="input02" style="font-size: 18px; height: 1em; width: 70%; word-break: break-word;" value="{{ info["input02"] }}">
+        </div>
+        <div class="side_container">
+          <input type="submit" name="submit" class="side_inbl" style="width: 6em; margin-right: 15px; padding-top: 3px;" value="Submit">
+          <input type="submit" name="submit" class="side_inbl" style="width: 10em; margin-right: 15px; padding-top: 3px;" value="Word Analyses">
+          <input type="submit" name="submit" class="side_inbl" style="width: 20em; margin-right: 15px; padding-top: 3px;" value="Layer and Attention Head Analyses">
+        </div>
+      </form>
+    </div>
+    <hr/>
+
+
+    <div class="side_container">
+      <label for="prediction" class="side_inbl" style="width: 6em;">Prediction:</label>
+      <input type="text" class="side_inbl" name="prediction", id="prediction" disabled style="font-size: 18px; height: 1em; width: 80%; word-break: break-word;" value="{{ info["prediction"] }}">
+    </div>
+    <hr/>
+
+    <p>Model Visualizations:</p>
+    <div id="model_visualization">
+      <button class="collapsible" cat="prediction">Prediction</button>
+      <div class="content">
+        <div class="scrollmenu" align="center">
+          <div class="rowscroll" align="center" style="text-align: center;">
+            <div  align="center" id="logit_div" cat='vector_draw'></div>
+          </div>
+        </div>
+      </div>
+
+      <button class="collapsible" cat="layer_weight_impact">Layers Impact</button>
+      <div class="content">
+        <a  item-id='W_layers_impact_div' for="LW">Weights</a>,
+        <a  item-id='G_layers_impact_div' for="LG">Gradient/Saliency</a>
+        <a  item-id='T_layers_impact_div' for="LT">Taylor</a>
+        <div class="scrollmenu" align="center">
+          <div class="rowscroll" align="center" style="text-align: center;">
+            <div  align="center" id="W_layers_impact_div" cat='vector_draw'></div>
+            <div  align="center" id="G_layers_impact_div" cat='vector_draw'></div>
+            <div  align="center" id="T_layers_impact_div" cat='vector_draw'></div>
+          </div>
+        </div>
+      </div>
+
+      <div cat="devop">
+        {% for layer_idx in info["layer_idx"] %}
+          <button class="collapsible" cat="layer">Layer {{ layer_idx }}</button>
+          <div class="content">
+            <a  item-id='W_L_{{layer_idx}}' for="W">Weights</a>,
+            <a  item-id='G_L_{{layer_idx}}' for="G">Gradient/Saliency</a>
+            <a  item-id='T_L_{{layer_idx}}' for="T">Taylor</a>
+            <button class="collapsible" cat="layer_output" layer_idx={{layer_idx}}>Layer Output</button>
+            <div class="content">
+              <div class="scrollmenu" align="center">
+                <div class="rowscroll" align="center" style="text-align: center;">
+                  <div item-id='W_L_{{layer_idx}}' id="W_L_{{layer_idx}}_output_div"  align="center" cat='vector_draw' class="vector_embed"></div>
+                  <div item-id='G_L_{{layer_idx}}' id="G_L_{{layer_idx}}_output_div"  align="center" cat='vector_draw' class="vector_embed"></div>
+                  <div item-id='T_L_{{layer_idx}}' id="T_L_{{layer_idx}}_output_div"  align="center" cat='vector_draw' class="vector_embed"></div>
+                </div>
+              </div>
+            </div>
+            <button class="collapsible" cat="layer_impact" layer_idx={{layer_idx}}>Attention Head Impact</button>
+            <div class="content">
+              <div class="scrollmenu" align="center">
+                <div class="rowscroll" align="center" style="text-align: center;">
+                  <div item-id='W_L_{{layer_idx}}' id="W_L_{{layer_idx}}_impact_div"  align="center" cat='vector_draw' class="vector_embed"></div>
+                  <div item-id='G_L_{{layer_idx}}' id="G_L_{{layer_idx}}_impact_div"  align="center" cat='vector_draw' class="vector_embed"></div>
+                  <div item-id='T_L_{{layer_idx}}' id="T_L_{{layer_idx}}_impact_div"  align="center" cat='vector_draw' class="vector_embed"></div>
+                </div>
+              </div>
+            </div>
+            <button class="collapsible" cat="head_output" layer_idx={{layer_idx}}>Attention Head</button>
+            <div class="content">
+              {% for head_idx in range(0, info["head_count"]) %}
+                <a  item-id='L_{{layer_idx}}_H_{{head_idx}}' for="H_{{head_idx}}">Head_{{head_idx}}</a>
+              {% endfor %}
+              <div class="scrollmenu" align="center">
+                {% for head_idx in range(0, info["head_count"]) %}
+                  <div item-id='L_{{layer_idx}}_H_{{head_idx}}' class="insidescroll">
+                    <div class="rowscroll" align="center" style="text-align: center;">
+                      <p style="text-align: center;">Head {{head_idx}}</p>
+                      <div class="array_embed" item-id='W_L_{{layer_idx}}' id="W_L_{{layer_idx}}_head_{{head_idx}}_div" cat='array_draw' ></div>
+                      <div class="array_embed" item-id='G_L_{{layer_idx}}' id="G_L_{{layer_idx}}_head_{{head_idx}}_div" cat='array_draw' ></div>
+                      <div class="array_embed" item-id='T_L_{{layer_idx}}' id="T_L_{{layer_idx}}_head_{{head_idx}}_div" cat='array_draw' ></div>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+
+      <button class="collapsible" cat="embedding">Embeding</button>
+      <div class="content">
+        <a  item-id='W_Embd' for="WE">Weights</a>,
+        <a  item-id='G_Embd' for="GE">Gradient/Saliency</a>
+        <a  item-id='T_Embd' for="TE">Taylor</a>
+        <button class="collapsible" cat="main_embedding">Main Embedding</button>
+        <div class="content">
+          <div class="scrollmenu" align="center">
+            <div class="rowscroll" align="center" style="text-align: center;">
+              <div item-id='W_Embd' id="W_Embd" align="center" cat='vector_draw' class="vector_embed"></div>
+              <div item-id='G_Embd' id="G_Embd" align="center" cat='vector_draw' class="vector_embed"></div>
+              <div item-id='T_Embd' id="T_Embd" align="center" cat='vector_draw' class="vector_embed"></div>
+            </div>
+          </div>
+        </div>
+        <div cat="devop" class="embd_content">
+          <button class="collapsible" cat="sub_embedding">Sub Embedding</button>
+          <div class="content">
+            {% for sub_embd_name in info["sub_embedding_WG"] %}
+              <a  item-id='SE_{{sub_embd_name}}' for="SE_{{sub_embd_name}}">{{sub_embd_name}} Embedding</a>
+            {% endfor %}
+            <div class="scrollmenu" align="center">
+              {% for sub_embd_name in info["sub_embedding_WG"] %}
+                <div item-id='SE_{{sub_embd_name}}' class="insidescroll">
+                  <div class="rowscroll" align="center" style="text-align: center;">
+                    <p style="text-align: center;">{{sub_embd_name}} Embedding</p>
+                    <div class="vector_embed" item-id='W_Embd' id="W_Subembd_{{sub_embd_name}}_div" cat='vector_draw'></div>
+                    <div class="vector_embed" item-id='G_Embd' id="G_Subembd_{{sub_embd_name}}_div" cat='vector_draw'></div>
+                    <div class="vector_embed" item-id='T_Embd' id="T_Subembd_{{sub_embd_name}}_div" cat='vector_draw'></div>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <hr/>
+
+    <div id="footer">
+      <div>
+        <center>
+          <img src="/static/img/Microsoft.png" alt="" style="padding: 20px;" width="200" height="100">
+        </center>
+      </div>
+      <div class="foot_text" style="text-align: center; width: 100%;">Reza Ghaeini. ©2019 Microsoft. All Rights Reserved</div>
+    </div>
+
+
+    <script>
+      var json = {{info["json"]|safe}}
+
+      var margin = {top: 5, right: 5, bottom: {{info["json"]["x_margin"]|safe}}, left: {{info["json"]["y_margin"]|safe}} },
+        width = 35*{{info["json"]["len"]|safe}},
+        height = 35*{{info["json"]["len"]|safe}},
+        vector_height = 35;
+
+      // Labels of row and columns
+      var sentence = {{ info["json"]["x"]|safe }}
+      var classes = {{info["json"]["classes"]|safe}}
+      var heads = {{info["json"]["head_names"]|safe}}
+      var layers = {{info["json"]["layer_names"]|safe}}
+
+      // Build X scales and axis:
+      var x = d3.scaleBand()
+        .range([ 0, width ])
+        .domain(sentence)
+        .padding(0.01);
+
+      // Build X scales and axis:
+      var c_x = d3.scaleBand()
+        .range([ 0, width ])
+        .domain(classes)
+        .padding(0.01);
+
+      var l_x = d3.scaleBand()
+        .range([ 0, width ])
+        .domain(layers)
+        .padding(0.01);
+
+      // Build X scales and axis:
+      var h_x = d3.scaleBand()
+        .range([ 0, width ])
+        .domain(heads)
+        .padding(0.01);
+
+      // Build X scales and axis:
+      var y = d3.scaleBand()
+        .range([ height, 0 ])
+        .domain(sentence)
+        .padding(0.01);
+
+      var v_y = d3.scaleBand()
+        .range([ vector_height, 0 ])
+        .domain([''])
+        .padding(0.01);
+
+      // Build color scale
+      var myColor = d3.scaleLinear()
+        .range(["white", "#250082"])
+        .domain([0,1])
+
+      function draw_vector(id_str, data_array, x_axis, x_lbls){
+        var svg = d3.select(id_str)
+          .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", vector_height + margin.top + margin.bottom)
+          .append("g")
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+        svg.append("g")
+          .attr("transform", "translate(0," + vector_height + ")")
+          .call(d3.axisBottom(x_axis))
+          .selectAll("text")
+            .style("text-anchor", "end")
+            .attr("transform", "rotate(-35)");
+        var vector = svg.selectAll()
+          .data(data_array, function(d, i) {return x_lbls[(i%x_lbls.length)]+':'+'';})
+          .enter()
+            .append("rect")
+            .attr("x", function(d, i) { return x(x_lbls[(i%x_lbls.length)]) })
+            .attr("y", function(d, i) { return v_y('') })
+            .attr("width", x.bandwidth() )
+            .attr("height", v_y.bandwidth() )
+            .style("fill", function(d, i) { return myColor(d)} )
+
+        vector.append("title")
+          .text(function(d) { return "value: " + d; });
+      }
+      function draw_matrix(id_str, data_array){
+        var svg = d3.select(id_str)
+          .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+          .append("g")
+            .attr("transform",
+              "translate(" + margin.left + "," + margin.top + ")");
+        svg.append("g")
+          .attr("transform", "translate(0," + height + ")")
+          .call(d3.axisBottom(x))
+          .selectAll("text")
+            .style("text-anchor", "end")
+            .attr("transform", "rotate(-35)");
+        svg.append("g")
+          .call(d3.axisLeft(y));
+        var heatmap = svg.selectAll()
+          .data(data_array, function(d, i) {return sentence[(i%sentence.length)]+':'+sentence[Math.floor(i/sentence.length)];})
+          .enter()
+            .append("rect")
+            .attr("x", function(d, i) { return x(sentence[(i%sentence.length)]) })
+            .attr("y", function(d, i) { return y(sentence[Math.floor(i/sentence.length)]) })
+            .attr("width", x.bandwidth() )
+            .attr("height", y.bandwidth() )
+            .style("fill", function(d, i) { return myColor(d); })
+
+        heatmap.append("title")
+          .text(function(d) { return "value: " + d; });
+      }
+
+      function draw_layer_weight_impact(){
+        draw_vector("#W_layers_impact_div", json.layers_impact_W, l_x, layers);
+        draw_vector("#G_layers_impact_div", json.layers_impact_G, l_x, layers);
+        draw_vector("#T_layers_impact_div", json.layers_impact_T, l_x, layers);
+      }
+      function remove_layer_weight_impact(){
+        $("#W_layers_impact_div").empty();
+        $("#G_layers_impact_div").empty();
+        $("#T_layers_impact_div").empty();
+      }
+      function draw_main_embedding(){
+        draw_vector("#W_Embd", json.embedding_W_main, x, sentence);
+        draw_vector("#G_Embd", json.embedding_G_main, x, sentence);
+        draw_vector("#T_Embd", json.embedding_T_main, x, sentence);
+      }
+      function remove_main_embedding(){
+        $("#W_Embd").empty();
+        $("#G_Embd").empty();
+        $("#T_Embd").empty();
+      }
+      function draw_sub_embedding(){
+        json.sub_embedding_WG.forEach(function(d){
+          draw_vector("#W_Subembd_"+d.name+"_div", d.W, x, sentence)
+          draw_vector("#G_Subembd_"+d.name+"_div", d.G, x, sentence)
+          draw_vector("#T_Subembd_"+d.name+"_div", d.T, x, sentence)
+        });
+      }
+      function remove_sub_embedding(){
+        json.sub_embedding_WG.forEach(function(d){
+          $("#W_Subembd_"+d.name+"_div").empty();
+          $("#G_Subembd_"+d.name+"_div").empty();
+          $("#T_Subembd_"+d.name+"_div").empty();
+        });
+      }
+      function draw_layer_output(_dict, idx){
+        draw_vector("#W_L_"+idx+"_output_div", _dict.W_output, x, sentence);
+        draw_vector("#G_L_"+idx+"_output_div", _dict.G_output, x, sentence);
+        draw_vector("#T_L_"+idx+"_output_div", _dict.T_output, x, sentence);
+      }
+      function remove_layer_output(idx){
+        $("#W_L_"+idx+"_output_div").empty();
+        $("#G_L_"+idx+"_output_div").empty();
+        $("#T_L_"+idx+"_output_div").empty();
+      }
+      function draw_layer_impact(_dict, idx){
+        draw_vector("#W_L_"+idx+"_impact_div", _dict.W_impact, h_x, heads);
+        draw_vector("#G_L_"+idx+"_impact_div", _dict.G_impact, h_x, heads);
+        draw_vector("#T_L_"+idx+"_impact_div", _dict.T_impact, h_x, heads);
+      }
+      function remove_layer_impact(idx){
+        $("#W_L_"+idx+"_impact_div").empty();
+        $("#G_L_"+idx+"_impact_div").empty();
+        $("#T_L_"+idx+"_impact_div").empty();
+      }
+      function draw_attention_head(_dict, layer_idx){
+        var i;
+        for (i = 0; i < json.head_count; i++) {
+          draw_matrix("#W_L_"+layer_idx+"_head_"+i+"_div", _dict.W_Head[i]);
+          draw_matrix("#G_L_"+layer_idx+"_head_"+i+"_div", _dict.G_Head[i]);
+          draw_matrix("#T_L_"+layer_idx+"_head_"+i+"_div", _dict.T_Head[i]);
+        }
+      }
+      function remove_attention_head(layer_idx){
+        var i;
+        for (i = 0; i < json.head_count; i++) {
+          $("#W_L_"+layer_idx+"_head_"+i+"_div").empty();
+          $("#G_L_"+layer_idx+"_head_"+i+"_div").empty();
+          $("#T_L_"+layer_idx+"_head_"+i+"_div").empty();
+        }
+      }
+
+      draw_vector("#logit_div", json.logit, c_x, classes);
+      draw_layer_weight_impact();
+
+      $(function(){
+        $(".collapsible").click(function(e){
+          this.classList.toggle("active");
+          var parent = this.parentElement;
+          var content = this.nextElementSibling;
+          if (content.style.maxHeight){
+            content.style.maxHeight = null;
+            console.log($(e.target).attr("cat"))
+            if ($(e.target).attr("cat") == "main_embedding"){
+              remove_main_embedding();
+            } else if ($(e.target).attr("cat") == "sub_embedding"){
+              remove_sub_embedding();
+            } else if ($(e.target).attr("cat") == "layer_output"){
+              idx = $(e.target).attr("layer_idx")
+              remove_layer_output(idx);
+            } else if ($(e.target).attr("cat") == "layer_impact"){
+              idx = $(e.target).attr("layer_idx")
+              remove_layer_impact(idx);
+            } else if ($(e.target).attr("cat") == "head_output"){
+              idx = $(e.target).attr("layer_idx")
+              remove_attention_head(idx);
+            }
+          } else {
+            if ($(e.target).attr("cat") == "main_embedding"){
+              draw_main_embedding();
+            } else if ($(e.target).attr("cat") == "sub_embedding"){
+              draw_sub_embedding();
+            } else if ($(e.target).attr("cat") == "layer_output"){
+              idx = parseInt($(e.target).attr("layer_idx"), 10);
+              draw_layer_output(json.layers[idx], idx);
+            } else if ($(e.target).attr("cat") == "layer_impact"){
+              idx = parseInt($(e.target).attr("layer_idx"), 10);
+              draw_layer_impact(json.layers[idx], idx);
+            } else if ($(e.target).attr("cat") == "head_output"){
+              idx = parseInt($(e.target).attr("layer_idx"), 10);
+              draw_attention_head(json.layers[idx], idx);
+            }
+            content.style.maxHeight = content.scrollHeight + "px";
+            if (parent.className == "content"){
+              parent.style.maxHeight = parent.scrollHeight + content.scrollHeight + "px";
+            } else if (parent.className == "embd_content"){
+              var superparent = parent.parentElement;
+              superparent.style.maxHeight = superparent.scrollHeight + content.scrollHeight + "px";
+            }
+          }
+        });
+      });
+      $(function() {
+        $("#taskcombo").on("change", function(e) {
+          var s2_sts = $("option:selected", this).attr("s2_sts");
+          if (s2_sts == "1"){
+            $(input02_div).show();
+          } else {
+            $(input02_div).hide();
+          }
+        }).change();
+      });
+      $(function() {
+        $("#usercombo").on("change", function(e) {
+          var utype = $("option:selected", this).text();
+          if (utype == "Developer"){
+            $("div[cat=devop]").show()
+          } else {
+            $("div[cat=devop]").hide()
+          }
+        }).change();
+      });
+      $(function(){
+        $("a[item-id]").click(function(e){
+          this.classList.toggle("select");
+          $("div[item-id="+$(e.target).attr("item-id")+"]").toggle()
+        });
+      });
+    </script>
+  </body>
+</html>

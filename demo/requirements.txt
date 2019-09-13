@@ -1,0 +1,5 @@
+nltk
+flask
+numpy
+matplotlib
+flask_socketio

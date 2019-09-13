@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>Interpretable BERT</title>
+    <!-- Load SocketIO -->
+    <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js" integrity="sha256-yr4fRk/GU1ehYJPAs8P4JlTgu0Hdsp4ZKrx8bDEDC3I=" crossorigin="anonymous"></script>
+    <!-- Load jQuery -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <!-- Load D3 -->
+    <script src="https://d3js.org/d3.v4.js"></script>
+
+    <style>
+      a{
+        color: blue;
+        text-decoration: underline;
+      }
+      a:hover {
+        color: hotpink;
+      }
+      .select {
+        color: red;
+      }
+      div.scrollmenu {
+        overflow: auto;
+        white-space: nowrap;
+      }
+      div.insidescroll {
+        display: inline-block;
+        padding: 3px;
+      }
+      .collapsible {
+        font-family: centrale_sans_book, tahoma, arial, helvetica, sans-serif;
+        font-size: 15px;
+        font-stretch: normal;
+        font-style: normal;
+        font-variant: normal;
+        font-weight: normal;
+        background-color: #777;
+        color: white;
+        cursor: pointer;
+        padding: 6px;
+        width: 100%;
+        border: none;
+        text-align: left;
+        outline: none;
+        border-bottom:1px solid black;
+      }
+      .active, .collapsible:hover {
+        background-color: #555;
+        border-bottom:1px solid black;
+      }
+      .content {
+        padding: 0 18px;
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.2s ease-out;
+        background-color: #f1f1f1;
+      }
+      .div-logo-row  {
+        height: 125px;
+        background-image: linear-gradient(145deg, rgb(11, 34, 101), rgb(0, 57, 166));
+        margin-bottom: 30px;
+        white-space: nowrap;
+      }
+      .title {
+        font-family: centrale_sans_xbold, tahoma, arial, helvetica, sans-serif;
+        font-size: 60px;
+        font-stretch: normal;
+        font-style: normal;
+        font-variant: normal;
+        font-weight: normal;
+        color:#FFF;
+        margin-left:25px;
+        padding-top:25px;
+        float: left;
+        display: inline-block;
+        vertical-align: top;
+      }
+      .column_logo {
+        float: right;
+        display: inline-block;
+        vertical-align: top;
+        padding: 5px;
+      }
+      .foot_text {
+        display: inline-block;
+        vertical-align: top;
+      }
+      .side_inbl {
+        display: inline-block;
+        vertical-align: top;
+      }
+      .side_container {
+        white-space: nowrap;
+        padding: 3px;
+      }
+      .vector_embed {
+        display: block;
+      }
+      .array_embed {
+        display: block;
+        padding: 1px;
+      }
+      #footer {
+        font-family: centrale_sans_book, tahoma, arial, helvetica, sans-serif;
+        font-size: 14px;
+        font-stretch: normal;
+        font-style: normal;
+        font-variant: normal;
+        font-weight: normal;
+        color: white;
+        background-image: linear-gradient(145deg, rgb(11, 34, 101), rgb(0, 57, 166));
+        padding-bottom: 20px;
+      }
+      .links line {
+        stroke: #000000;
+      }
+      .nodes rect {
+        pointer-events: all;
+        stroke: none;
+        stroke-width: 2px;
+      }
+    </style>
+</head>
+  <body>
+    <div class="div-logo-row">
+      <div class="title">Interpretable BERT</div>
+      <div class="column_logo">
+        <img src="/static/img/Microsoft_logo.png" alt="" width="115" height="115">
+      </div>
+    </div>
+    <hr/>
+
+    <div>
+      <div class="side_container">
+        <label for="org_task" class="side_inbl" style="width: 8em;">Task:</label>
+        <input type="text" class="side_inbl" name="task" disabled id="org_task" style="font-size: 18px; height: 1em; width: 70%; word-break: break-word;" value="{{ info["task"] }}">
+      </div>
+      <div class="side_container">
+        <label for="org_input" class="side_inbl" style="width: 8em;">Original Input:</label>
+        <input type="text" class="side_inbl" name="org_input" disabled id="org_input" style="font-size: 18px; height: 1em; width: 70%; word-break: break-word;" value="{{ info["original_input"] }}">
+      </div>
+      <div class="side_container">
+        <label for="org_prediction" class="side_inbl" style="width: 8em;">Original Prediction:</label>
+        <input type="text" class="side_inbl" name="org_prediction" disabled style="font-size: 18px; height: 1em; width: 70%; word-break: break-word;" value="{{ info["org_prediction"] }}">
+      </div>
+      <div  align="center" id="org_logit_div" cat='vector_draw'></div>
+    </div>
+    </hr>
+
+    <p>Behavior Analyses:</p>
+    <div>
+      <div class="side_container">
+        <label for="cur_prediction" class="side_inbl" style="width: 8em;">Current Prediction:</label>
+        <input type="text" class="side_inbl" name="cur_prediction" id="cur_prediction" disabled style="font-size: 18px; height: 1em; width: 70%; word-break: break-word;" value="{{ info["org_prediction"] }}">
+      </div>
+      <div  align="center" id="cur_logit_div" cat='vector_draw'></div>
+    </div>
+    </hr>
+
+    <p> Model Structure: </p>
+    <div align="center">
+      <svg id="model_svg" width="{{info["model_width"]}}" height="{{info["model_height"]}}"></svg>
+    </div>
+
+    <div id="footer">
+      <div>
+        <center>
+          <img src="/static/img/Microsoft.png" alt="" style="padding: 20px;" width="200" height="100">
+        </center>
+      </div>
+      <div class="foot_text" style="text-align: center; width: 100%;">Reza Ghaeini. ©2019 Microsoft. All Rights Reserved</div>
+    </div>
+
+
+    <script>
+      var margin = {top: 5, right: 5, bottom: 35, left: 5 },
+        width = 400,
+        height = 35,
+        struct_width = {{info["model_width"]|safe}},
+        struct_height = {{info["model_height"]|safe}};
+
+      var classes = {{info["classes"]|safe}}
+      var org_logit = {{info["org_logit_vector"]|safe}}
+
+      var c_x = d3.scaleBand()
+        .range([ 0, width ])
+        .domain(classes)
+        .padding(0.01);
+
+      var v_y = d3.scaleBand()
+        .range([ height, 0 ])
+        .domain([''])
+        .padding(0.01);
+
+      var myColor = d3.scaleLinear()
+        .range(["white", "#250082"])
+        .domain([0,1])
+
+      function draw_logit(id_str, vals) {
+        $(id_str).empty()
+        // create a tooltip
+        var cur_svg = d3.select(id_str)
+          .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+          .append("g")
+            .attr("transform",
+                  "translate(" + margin.left + "," + margin.top + ")");
+        cur_svg.append("g")
+          .attr("transform", "translate(0," + height + ")")
+          .call(d3.axisBottom(c_x))
+        var head_map = cur_svg.selectAll()
+          .data(vals, function(d, i) {return classes[(i%classes.length)]+':'+'';})
+          .enter()
+          .append("rect")
+          .attr("x", function(d, i) { return c_x(classes[(i%classes.length)]) })
+          .attr("y", function(d, i) { return v_y('') })
+          .attr("width", c_x.bandwidth() )
+          .attr("height", v_y.bandwidth() )
+          .style("fill", function(d, i) { return myColor(d); } )
+
+        head_map.append("title")
+        .text(function(d) { return "value: " + d; });
+      }
+
+
+      draw_logit("#org_logit_div", org_logit);
+      draw_logit("#cur_logit_div", org_logit);
+
+
+      $(document).ready(function(){
+        var socket = io('/structure_analyze');
+        var head_status = {};
+        var layer_status = {};
+
+        function draw_model(graph) {
+          graph.nodes.forEach( function(d) {
+            if (d.group == 1) {
+              head_status[d.id] = 1;
+            } else if (d.group == 2) {
+              layer_status[d.id] = 1;
+            }
+          });
+          var svg = d3.select("#model_svg"),
+              width = +svg.attr("width"),
+              height = +svg.attr("height");
+
+          var simulation = d3.forceSimulation()
+            .force("link", d3.forceLink().id(function(d) { return d.id; }))
+            .force('x', d3.forceX().x(d => d.x))
+            .force('y', d3.forceY().y(d => d.y));
+
+          var link = svg.append("g")
+            .attr("class", "links")
+            .selectAll("line")
+            .data(graph.links)
+            .enter()
+              .append("line")
+              .attr("x1", function(d) { return d.x1; })
+              .attr("y1", function(d) { return d.y1; })
+              .attr("x2", function(d) { return d.x2; })
+              .attr("y2", function(d) { return d.y2; });;
+
+          var node = svg.append("g")
+            .attr("class", "nodes")
+            .selectAll("rect")
+            .data(graph.nodes)
+            .enter()
+              .append("rect")
+              .attr("width", function(d) {return d.w; })
+              .attr("height", function(d) {
+                    if (typeof d.h == "undefined") { return graph.comp_h }
+                    else { return d.h }
+                ;})
+              .attr("rx", 4)
+              .attr("x", function(d) {return d.x; })
+              .attr("y", function(d) {return d.y; })
+              .attr("id", function(d) {return d.id;})
+              .style("stroke", "#000000")
+              .style("fill", "#4fd62d" )
+              .on("mouseover", function(d){
+                d3.select(this)
+                  .style("stroke-width", "4px")
+              })
+              .on("mouseleave", function(d){
+                d3.select(this)
+                  .style("stroke-width", "2px")
+              })
+              .on("click", function(d){
+                if (d.group == 1){
+                  if (head_status[d.id] == 1){
+                    d3.select(this)
+                      .style("fill", "#a10505")
+                      head_status[d.id] = 0;
+                  } else {
+                    d3.select(this)
+                      .style("fill", "#4fd62d")
+                      head_status[d.id] = 1;
+                  }
+                  socket.emit('change_structure', {'layer_status': layer_status, 'head_status': head_status, 'task':  $('#org_task').val(), 'input': $('#org_input').val()})
+                }
+                if (d.group == 2){
+                  if (layer_status[d.id] == 1){
+                    d3.select(this)
+                      .style("fill", "#a10505")
+                      layer_status[d.id] = 0;
+                  } else {
+                    d3.select(this)
+                      .style("fill", "#4fd62d")
+                      layer_status[d.id] = 1;
+                  }
+                  socket.emit('change_structure', {'layer_status': layer_status, 'head_status': head_status, 'task':  $('#org_task').val(), 'input': $('#org_input').val()})
+                }
+              })
+
+          var node_text = svg.append("g")
+            .selectAll("text")
+            .data(graph.nodes)
+            .enter()
+              .append("text")
+              .attr("x", function(d) {return d.x+5; })
+              .attr("y", function(d) {return d.y+14; })
+              .text(function(d) {return d.text; })
+
+          node.append("title")
+            .text(function(d) { return d.id; });
+
+          simulation
+            .nodes(graph.nodes);
+
+          simulation.force("link")
+            .links(graph.links);
+        }
+
+        socket.on('connect_response', function(msg) {
+          draw_model(msg)
+        });
+
+        socket.on('change_response', function(msg) {
+          $('#cur_prediction').val(msg.prediction);
+          draw_logit("#cur_logit_div", msg.logit);
+        });
+
+      });
+    </script>
+  </body>
+</html>

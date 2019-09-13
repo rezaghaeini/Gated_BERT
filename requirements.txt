@@ -1,0 +1,9 @@
+tqdm
+boto3
+regex
+requests
+scikit-learn
+torch>=0.4.1
+tensorboardX
+sentencepiece
+pytorch-transformers

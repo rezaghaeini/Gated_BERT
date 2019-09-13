@@ -1,0 +1,178 @@
+<!-- add /static/ -->
+
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Interpretable BERT</title>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+        <style>
+            a{
+                color: blue;
+                text-decoration: underline;
+            }
+            a:hover {
+                color: hotpink;
+            }
+            .select {
+                color: red;
+            }
+            div.scrollmenu {
+                overflow: auto;
+                white-space: nowrap;
+            }
+            div.insidescroll {
+                display: inline-block;
+                padding: 6px;
+            }
+            .collapsible {
+                font-family: centrale_sans_book, tahoma, arial, helvetica, sans-serif;
+                font-size: 15px;
+                font-stretch: normal;
+                font-style: normal;
+                font-variant: normal;
+                font-weight: normal;
+                background-color: #777;
+                color: white;
+                cursor: pointer;
+                padding: 6px;
+                width: 100%;
+                border: none;
+                text-align: left;
+                outline: none;
+                border-bottom:1px solid black;
+            }
+            .active, .collapsible:hover {
+                background-color: #555;
+                border-bottom:1px solid black;
+            }
+            .content {
+                padding: 0 18px;
+                max-height: 0;
+                overflow: hidden;
+                transition: max-height 0.2s ease-out;
+                background-color: #f1f1f1;
+            }
+            .div-logo-row  {
+                height: 125px;
+                background-image: linear-gradient(145deg, rgb(11, 34, 101), rgb(0, 57, 166));
+                margin-bottom: 30px;
+                white-space: nowrap;
+            }
+            .title {
+                font-family: centrale_sans_xbold, tahoma, arial, helvetica, sans-serif;
+                font-size: 60px;
+                font-stretch: normal;
+                font-style: normal;
+                font-variant: normal;
+                font-weight: normal;
+                color:#FFF;
+                margin-left:25px;
+                padding-top:25px;
+                float: left;
+                display: inline-block;
+                vertical-align: top;
+            }
+            .column_logo {
+                float: right;
+                display: inline-block;
+                vertical-align: top;
+                padding: 5px;
+            }
+            .foot_text {
+                display: inline-block;
+                vertical-align: top;
+            }
+            .side_inbl {
+                display: inline-block;
+                vertical-align: top;
+            }
+            .side_container {
+                white-space: nowrap;
+                padding: 5px;
+            }
+            .vector_embed {
+                height: 200px;
+                width: 600px;
+                display: block;
+            }
+            .array_embed {
+                height: 500px;
+                width: 550px;
+                display: block;
+                padding: 4px;
+            }
+            #footer {
+                font-family: centrale_sans_book, tahoma, arial, helvetica, sans-serif;
+                font-size: 14px;
+                font-stretch: normal;
+                font-style: normal;
+                font-variant: normal;
+                font-weight: normal;
+                color: white;
+                background-image: linear-gradient(145deg, rgb(11, 34, 101), rgb(0, 57, 166));
+                padding-bottom: 20px;
+            }
+        </style>
+    </head>
+
+    <body>
+
+        <div class="div-logo-row">
+            <div class="title">Interpretable BERT</div>
+            <div class="column_logo">
+                <img src="/static/img/Microsoft_logo.png" alt="" width="115" height="115">
+            </div>
+        </div>
+        <hr/>
+
+        <div>
+            <form action="." method="POST" style="margin-bottom: 10px;">
+                <div class="side_container">
+                    <label for="tasks" class="side_inbl" style="width: 6em;">Task:</label>
+                    <select class="side_inbl" name="taskcombo" id="taskcombo" style="font-size: 18px; height: 1em;">
+                        {% for task_index in range(0, info["task_count"]) %}
+                            <option item-id="option_{{loop.index0}}" s2_sts="{{ info["task_pair"][task_index] }}" value="{{ info["task_set"][task_index] }}" {% if task_index == info["selected_task_id"] %} selected {% endif %}>{{ info["task_set"][task_index] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="side_container">
+                    <label for="users" class="side_inbl" style="width: 6em;">User Type:</label>
+                    <select class="side_inbl" name="usercombo" id="usercombo" style="font-size: 18px; height: 1em;">
+                        <option item-id="user_0" value="Developer" {% if info["selected_user"] == "Developer" %} selected {% endif %}>Developer</option>
+                        <option item-id="user_1" value="User" {% if info["selected_user"] == "User" %} selected {% endif %}>User</option>
+                    </select>
+                </div>
+                <div class="side_container">
+                    <label for="input01" class="side_inbl" style="width: 6em;">1st Sentence:</label>
+                    <input type="text" class="side_inbl" name="input01" style="font-size: 18px; height: 1em; width: 70%; word-break: break-word;" value="{{ info["input01"] }}">
+                </div>
+                <div class="side_container">
+                    <label for="input02" class="side_inbl" name="lbl02" id="lbl02" style="width: 6em;">2nd Sentence:</label>
+                    <input type="text" class="side_inbl" name="input02" id="input02" style="font-size: 18px; height: 1em; width: 70%; word-break: break-word;" value="{{ info["input02"] }}">
+                    <input type="submit" name="submit" class="side_inbl" style="width: 6em; margin-right: 15px; padding-top: 3px; align: right; float: right;" value="Submit">
+                </div>
+            </form>
+        </div>
+        <hr/>
+
+
+        <script>
+            $(function() {
+              // Hide second input entry for single input tasks
+                $("#taskcombo").on("change", function(e) {
+                    var s2_sts = $("option:selected", this).attr("s2_sts");
+                    if (s2_sts == "1"){
+                        $("#input02").css('visibility', 'visible');
+                        $("#lbl02").css('visibility', 'visible');
+                    } else {
+                        $("#input02").css('visibility', 'hidden');
+                        $("#lbl02").css('visibility', 'hidden');
+                    }
+                }).change();
+            });
+        </script>
+
+
+    </body>
+</html>
